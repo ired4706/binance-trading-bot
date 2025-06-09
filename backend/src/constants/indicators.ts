@@ -1,5 +1,36 @@
+interface RSIConfig {
+    PERIOD: number;
+    OVERBOUGHT: number;
+    OVERSOLD: number;
+}
+
+interface EMAConfig {
+    FAST: number;
+    SLOW: number;
+    SIGNAL: number;
+    EMA50: number;
+}
+
+interface FibonacciConfig {
+    LEVELS: number[];
+    DESCRIPTIONS: { [key: string]: string };
+}
+
+interface TradingParamsConfig {
+    DEFAULT_QUANTITY: number;
+    TP_PERCENTAGE: number;
+    SL_PERCENTAGE: number;
+    RISK_REWARD_RATIO: number;
+}
+
+interface IndicatorsConfig {
+    RSI: RSIConfig;
+    EMA: EMAConfig;
+    FIBONACCI: FibonacciConfig;
+}
+
 // Technical indicators configuration
-exports.INDICATORS = {
+export const INDICATORS: IndicatorsConfig = {
     RSI: {
         PERIOD: 14,
         OVERBOUGHT: 70,
@@ -24,7 +55,7 @@ exports.INDICATORS = {
 };
 
 // Trading parameters
-exports.TRADING_PARAMS = {
+export const TRADING_PARAMS: TradingParamsConfig = {
     DEFAULT_QUANTITY: 0.001,  // Default trading quantity
     TP_PERCENTAGE: 2.0,      // Take profit 2% (R/R = 2:1)
     SL_PERCENTAGE: 1.0,      // Stop loss 1%

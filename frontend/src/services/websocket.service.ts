@@ -1,11 +1,12 @@
-import { PriceData, AccountData } from '../types/websocket.types';
+import { PriceData, AccountData, TradingSettings } from '../types/websocket.types';
 
 class WebSocketService {
     private ws: WebSocket | null = null;
     private url: string;
 
     constructor() {
-        this.url = 'ws://localhost:3001';
+        // Connect to backend WebSocket server
+        this.url = 'ws://localhost:5000/ws';
     }
 
     public connect(
@@ -45,6 +46,15 @@ class WebSocketService {
             // Try to reconnect after 5 seconds
             setTimeout(() => this.connect(onPrice, onAccount), 5000);
         };
+    }
+
+    public updateSettings(settings: TradingSettings): void {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                type: 'UPDATE_SETTINGS',
+                payload: settings
+            }));
+        }
     }
 
     public disconnect(): void {

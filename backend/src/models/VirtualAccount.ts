@@ -1,15 +1,20 @@
-const { TRADING_PARAMS } = require('../constants/indicators');
-const { logTrade } = require('../utils/logger');
+import { TRADING_PARAMS } from '../constants/indicators';
+import { logTrade } from '../utils/logger';
+import { Position, Trade, AccountSummary } from '../types/trading.types';
 
 class VirtualAccount {
-    constructor(initialBalance = 10000) {
+    private balance: number;
+    private positions: Map<string, Position>;
+    private tradeHistory: Trade[];
+
+    constructor(initialBalance: number = 10000) {
         this.balance = initialBalance;
         this.positions = new Map();
         this.tradeHistory = [];
     }
 
     // Open a new position
-    openPosition(pair, type, price, quantity = TRADING_PARAMS.DEFAULT_QUANTITY) {
+    public openPosition(pair: string, type: 'BUY' | 'SELL', price: number, quantity: number = TRADING_PARAMS.DEFAULT_QUANTITY): Position {
         if (this.positions.has(pair)) {
             throw new Error(`Position already exists for ${pair}`);
         }
@@ -19,7 +24,8 @@ class VirtualAccount {
             throw new Error('Insufficient balance');
         }
 
-        const position = {
+        const position: Position = {
+            pair,
             type,
             entryPrice: price,
             quantity,
@@ -49,7 +55,7 @@ class VirtualAccount {
     }
 
     // Close a position
-    closePosition(pair, currentPrice) {
+    public closePosition(pair: string, currentPrice: number): Trade {
         const position = this.positions.get(pair);
         if (!position) {
             throw new Error(`No position found for ${pair}`);
@@ -61,7 +67,7 @@ class VirtualAccount {
 
         this.balance += (position.entryPrice * position.quantity) + pnl;
         
-        const trade = {
+        const trade: Trade = {
             pair,
             type: position.type,
             entryPrice: position.entryPrice,
@@ -88,7 +94,7 @@ class VirtualAccount {
     }
 
     // Check if price hits TP or SL
-    checkPositions(pair, currentPrice) {
+    public checkPositions(pair: string, currentPrice: number): Trade | null {
         const position = this.positions.get(pair);
         if (!position) return null;
 
@@ -112,11 +118,10 @@ class VirtualAccount {
     }
 
     // Get account summary
-    getAccountSummary() {
+    public getAccountSummary(): AccountSummary {
         return {
             balance: this.balance,
-            openPositions: Array.from(this.positions.entries()).map(([pair, position]) => ({
-                pair,
+            openPositions: Array.from(this.positions.entries()).map(([_, position]) => ({
                 ...position
             })),
             tradeHistory: this.tradeHistory
@@ -125,5 +130,4 @@ class VirtualAccount {
 }
 
 // Export a singleton instance
-const virtualAccount = new VirtualAccount();
-module.exports = { virtualAccount }; 
+export const virtualAccount = new VirtualAccount(); 

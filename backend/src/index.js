@@ -24,6 +24,7 @@ const processPriceData = (data) => {
         // Update price history
         if (!priceHistory.has(symbol)) {
             priceHistory.set(symbol, []);
+            logger.info(`Initialized price history for ${symbol}`);
         }
         
         const prices = priceHistory.get(symbol);
@@ -39,25 +40,43 @@ const processPriceData = (data) => {
             const analysis = indicatorService.analyzePriceWithIndicators(prices);
             
             // Check existing positions
-            virtualAccount.checkPositions(symbol, parseFloat(closePrice));
+            const positionCheck = virtualAccount.checkPositions(symbol, parseFloat(closePrice));
+            if (positionCheck) {
+                logger.info(`Position closed for ${symbol}:`, positionCheck);
+            }
 
             // Only execute trades if trading is enabled
             if (process.env.TRADING_ENABLED === 'true') {
+                logger.debug(`Trading conditions for ${symbol}:`, {
+                    price: closePrice,
+                    rsi: analysis.rsi,
+                    ema50: analysis.ema50,
+                    signals: analysis.signals,
+                    hasPosition: virtualAccount.positions.has(symbol),
+                    balance: virtualAccount.balance
+                });
+
                 // Trading logic based on indicators
-                if (analysis.signals.includes('RSI_OVERSOLD') && analysis.signals.includes('ABOVE_EMA50')) {
-                    try {
-                        virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
-                    } catch (error) {
-                        logger.warn(`Failed to open BUY position: ${error.message}`);
+                if (!virtualAccount.positions.has(symbol)) {  // Only trade if no position exists
+                    if (analysis.signals.includes('RSI_OVERSOLD') && analysis.signals.includes('ABOVE_EMA50')) {
+                        try {
+                            const position = virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
+                            logger.info(`Opened BUY position for ${symbol}:`, position);
+                        } catch (error) {
+                            logger.warn(`Failed to open BUY position: ${error.message}`);
+                        }
+                    }
+                    else if (analysis.signals.includes('RSI_OVERBOUGHT') && analysis.signals.includes('BELOW_EMA50')) {
+                        try {
+                            const position = virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
+                            logger.info(`Opened SELL position for ${symbol}:`, position);
+                        } catch (error) {
+                            logger.warn(`Failed to open SELL position: ${error.message}`);
+                        }
                     }
                 }
-                else if (analysis.signals.includes('RSI_OVERBOUGHT') && analysis.signals.includes('BELOW_EMA50')) {
-                    try {
-                        virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
-                    } catch (error) {
-                        logger.warn(`Failed to open SELL position: ${error.message}`);
-                    }
-                }
+            } else {
+                logger.debug('Trading is disabled');
             }
 
             // Calculate Fibonacci levels for reference
@@ -73,6 +92,8 @@ const processPriceData = (data) => {
                     fibonacciLevels: fibLevels
                 });
             }
+        } else {
+            logger.debug(`Collecting price history for ${symbol}: ${prices.length}/${PRICE_HISTORY_LENGTH}`);
         }
     } catch (error) {
         logError(error);

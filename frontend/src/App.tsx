@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Box, Paper, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { wsService } from './services/websocket.service';
-import { PriceData, AccountData } from './types/websocket.types';
+import { PriceData, AccountData, TradingSettings as TradingSettingsType } from './types/websocket.types';
+import { TradingSettings } from './components/TradingSettings';
 
 function App() {
   const [prices, setPrices] = useState<PriceData[]>([]);
   const [account, setAccount] = useState<AccountData>({ balance: 0, positions: [] });
+  const [settings, setSettings] = useState<TradingSettingsType>({
+    timeframe: '1m',
+    riskRewardRatio: 2
+  });
 
   useEffect(() => {
     const handlePrice = (data: PriceData) => {
@@ -29,9 +34,40 @@ function App() {
     return () => wsService.disconnect();
   }, []);
 
+  const handleTimeframeChange = (timeframe: string) => {
+    const newSettings = { ...settings, timeframe };
+    setSettings(newSettings);
+    wsService.updateSettings(newSettings);
+  };
+
+  const handleRiskRewardRatioChange = (riskRewardRatio: number) => {
+    const newSettings = { ...settings, riskRewardRatio };
+    setSettings(newSettings);
+    wsService.updateSettings(newSettings);
+  };
+
+  const renderPriceChange = (change: number) => (
+    <TableCell 
+      align="right"
+      sx={{ 
+        color: change >= 0 ? 'success.main' : 'error.main',
+        fontWeight: 'medium'
+      }}
+    >
+      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+    </TableCell>
+  );
+
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 3 }}>
       <Container>
+        <TradingSettings
+          timeframe={settings.timeframe}
+          riskRewardRatio={settings.riskRewardRatio}
+          onTimeframeChange={handleTimeframeChange}
+          onRiskRewardRatioChange={handleRiskRewardRatioChange}
+        />
+        
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
           {/* Price Table */}
           <Paper elevation={3} sx={{ p: 2, flex: 1 }}>
@@ -44,7 +80,9 @@ function App() {
                   <TableRow>
                     <TableCell>Symbol</TableCell>
                     <TableCell align="right">Price</TableCell>
-                    <TableCell align="right">Change</TableCell>
+                    <TableCell align="right">1m Change</TableCell>
+                    <TableCell align="right">1h Change</TableCell>
+                    <TableCell align="right">24h Change</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -52,17 +90,14 @@ function App() {
                     <TableRow key={price.symbol}>
                       <TableCell>{price.symbol}</TableCell>
                       <TableCell align="right">${price.price.toLocaleString()}</TableCell>
-                      <TableCell 
-                        align="right"
-                        sx={{ color: price.change >= 0 ? 'success.main' : 'error.main' }}
-                      >
-                        {price.change}%
-                      </TableCell>
+                      {renderPriceChange(price.change)}
+                      {renderPriceChange(price.change1h)}
+                      {renderPriceChange(price.change24h)}
                     </TableRow>
                   ))}
                   {prices.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} align="center">
+                      <TableCell colSpan={5} align="center">
                         Waiting for price data...
                       </TableCell>
                     </TableRow>
