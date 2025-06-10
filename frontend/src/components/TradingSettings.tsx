@@ -6,16 +6,22 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField,
   Box,
   SelectChangeEvent,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 
 interface TradingSettingsProps {
   timeframe: string;
   riskRewardRatio: number;
+  strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+  enabledStrategies: string[];
   onTimeframeChange: (timeframe: string) => void;
   onRiskRewardRatioChange: (ratio: number) => void;
+  onStrategyChange: (strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => void;
+  onEnabledStrategiesChange: (strategies: string[]) => void;
 }
 
 const timeframes = [
@@ -34,11 +40,22 @@ const riskRewardRatios = [
   { value: 3, label: '3:1' },
 ];
 
+const strategies = [
+  { value: 'RSI_EMA', label: 'RSI + EMA Strategy' },
+  { value: 'BB_RSI', label: 'Bollinger Bands + RSI' },
+  { value: 'SR_VOLUME', label: 'Support/Resistance + Volume' },
+  { value: 'ICHIMOKU', label: 'Ichimoku Cloud' },
+];
+
 export const TradingSettings: React.FC<TradingSettingsProps> = ({
   timeframe,
   riskRewardRatio,
+  strategy,
+  enabledStrategies,
   onTimeframeChange,
   onRiskRewardRatioChange,
+  onStrategyChange,
+  onEnabledStrategiesChange,
 }) => {
   const handleTimeframeChange = (event: SelectChangeEvent) => {
     onTimeframeChange(event.target.value);
@@ -48,41 +65,89 @@ export const TradingSettings: React.FC<TradingSettingsProps> = ({
     onRiskRewardRatioChange(Number(event.target.value));
   };
 
+  const handleStrategyChange = (event: SelectChangeEvent) => {
+    onStrategyChange(event.target.value as 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU');
+  };
+
+  const handleStrategyToggle = (strategyValue: string) => {
+    const newEnabledStrategies = enabledStrategies.includes(strategyValue)
+      ? enabledStrategies.filter(s => s !== strategyValue)
+      : [...enabledStrategies, strategyValue];
+    onEnabledStrategiesChange(newEnabledStrategies);
+  };
+
   return (
     <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
       <Typography variant="h6" gutterBottom>
         Trading Settings
       </Typography>
-      <Box sx={{ display: 'flex', gap: 2 }}>
-        <FormControl fullWidth>
-          <InputLabel>Timeframe</InputLabel>
-          <Select
-            value={timeframe}
-            label="Timeframe"
-            onChange={handleTimeframeChange}
-          >
-            {timeframes.map((tf) => (
-              <MenuItem key={tf.value} value={tf.value}>
-                {tf.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>Timeframe</InputLabel>
+            <Select
+              value={timeframe}
+              label="Timeframe"
+              onChange={handleTimeframeChange}
+            >
+              {timeframes.map((tf) => (
+                <MenuItem key={tf.value} value={tf.value}>
+                  {tf.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-        <FormControl fullWidth>
-          <InputLabel>Risk/Reward Ratio</InputLabel>
-          <Select
-            value={riskRewardRatio.toString()}
-            label="Risk/Reward Ratio"
-            onChange={handleRRChange}
-          >
-            {riskRewardRatios.map((rr) => (
-              <MenuItem key={rr.value} value={rr.value}>
-                {rr.label}
-              </MenuItem>
+          <FormControl fullWidth>
+            <InputLabel>Risk/Reward Ratio</InputLabel>
+            <Select
+              value={riskRewardRatio.toString()}
+              label="Risk/Reward Ratio"
+              onChange={handleRRChange}
+            >
+              {riskRewardRatios.map((rr) => (
+                <MenuItem key={rr.value} value={rr.value}>
+                  {rr.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>Primary Strategy</InputLabel>
+            <Select
+              value={strategy}
+              label="Primary Strategy"
+              onChange={handleStrategyChange}
+            >
+              {strategies.map((s) => (
+                <MenuItem key={s.value} value={s.value}>
+                  {s.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Box>
+          <Typography variant="subtitle1" gutterBottom>
+            Enabled Strategies
+          </Typography>
+          <FormGroup row>
+            {strategies.map((s) => (
+              <FormControlLabel
+                key={s.value}
+                control={
+                  <Checkbox
+                    checked={enabledStrategies.includes(s.value)}
+                    onChange={() => handleStrategyToggle(s.value)}
+                  />
+                }
+                label={s.label}
+              />
             ))}
-          </Select>
-        </FormControl>
+          </FormGroup>
+        </Box>
       </Box>
     </Paper>
   );

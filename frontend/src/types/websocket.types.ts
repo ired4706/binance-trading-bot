@@ -24,4 +24,6 @@ export interface AccountData {
 export interface TradingSettings {
     timeframe: string;
     riskRewardRatio: number;
+    strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+    enabledStrategies: string[];
 } 

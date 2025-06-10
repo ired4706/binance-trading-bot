@@ -9,7 +9,9 @@ function App() {
   const [account, setAccount] = useState<AccountData>({ balance: 0, positions: [] });
   const [settings, setSettings] = useState<TradingSettingsType>({
     timeframe: '1m',
-    riskRewardRatio: 2
+    riskRewardRatio: 1.5,
+    strategy: 'BB_RSI',
+    enabledStrategies: ['BB_RSI', 'SR_VOLUME', 'ICHIMOKU']
   });
 
   useEffect(() => {
@@ -46,6 +48,18 @@ function App() {
     wsService.updateSettings(newSettings);
   };
 
+  const handleStrategyChange = (strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => {
+    const newSettings = { ...settings, strategy };
+    setSettings(newSettings);
+    wsService.updateSettings(newSettings);
+  };
+
+  const handleEnabledStrategiesChange = (enabledStrategies: string[]) => {
+    const newSettings = { ...settings, enabledStrategies };
+    setSettings(newSettings);
+    wsService.updateSettings(newSettings);
+  };
+
   const renderPriceChange = (change: number) => (
     <TableCell 
       align="right"
@@ -64,8 +78,12 @@ function App() {
         <TradingSettings
           timeframe={settings.timeframe}
           riskRewardRatio={settings.riskRewardRatio}
+          strategy={settings.strategy}
+          enabledStrategies={settings.enabledStrategies}
           onTimeframeChange={handleTimeframeChange}
           onRiskRewardRatioChange={handleRiskRewardRatioChange}
+          onStrategyChange={handleStrategyChange}
+          onEnabledStrategiesChange={handleEnabledStrategiesChange}
         />
         
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
