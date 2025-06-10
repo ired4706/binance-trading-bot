@@ -1,16 +1,27 @@
 import { TRADING_PARAMS } from '../constants/indicators';
 import { logTrade } from '../utils/logger';
-import { Position, Trade, AccountSummary } from '../types/trading.types';
+import { Position, Trade, AccountSummary, TradingSettings } from '../types/trading.types';
 
 class VirtualAccount {
     private balance: number;
     private positions: Map<string, Position>;
     private tradeHistory: Trade[];
+    private settings: TradingSettings;
 
     constructor(initialBalance: number = 10000) {
         this.balance = initialBalance;
         this.positions = new Map();
         this.tradeHistory = [];
+        this.settings = {
+            timeframe: '1m',
+            riskRewardRatio: TRADING_PARAMS.RISK_REWARD_RATIO,
+            strategy: 'BB_RSI',
+            enabledStrategies: ['BB_RSI', 'SR_VOLUME', 'ICHIMOKU']
+        };
+    }
+
+    public updateSettings(settings: TradingSettings) {
+        this.settings = settings;
     }
 
     // Open a new position
@@ -24,17 +35,21 @@ class VirtualAccount {
             throw new Error('Insufficient balance');
         }
 
+        // Calculate SL and TP based on settings.riskRewardRatio
+        const slPercentage = TRADING_PARAMS.SL_PERCENTAGE;
+        const tpPercentage = slPercentage * this.settings.riskRewardRatio;
+
         const position: Position = {
             pair,
             type,
             entryPrice: price,
             quantity,
             takeProfit: type === 'BUY' ? 
-                price * (1 + TRADING_PARAMS.TP_PERCENTAGE / 100) :
-                price * (1 - TRADING_PARAMS.TP_PERCENTAGE / 100),
+                price * (1 + tpPercentage / 100) :
+                price * (1 - tpPercentage / 100),
             stopLoss: type === 'BUY' ?
-                price * (1 - TRADING_PARAMS.SL_PERCENTAGE / 100) :
-                price * (1 + TRADING_PARAMS.SL_PERCENTAGE / 100),
+                price * (1 - slPercentage / 100) :
+                price * (1 + slPercentage / 100),
             openTime: new Date()
         };
 
@@ -45,8 +60,8 @@ class VirtualAccount {
         logTrade({
             pair,
             type: 'OPEN',
-            price,
-            quantity,
+            price: position.entryPrice,
+            quantity: position.quantity,
             takeProfit: position.takeProfit,
             stopLoss: position.stopLoss
         });
@@ -58,15 +73,13 @@ class VirtualAccount {
     public closePosition(pair: string, currentPrice: number): Trade {
         const position = this.positions.get(pair);
         if (!position) {
-            throw new Error(`No position found for ${pair}`);
+            throw new Error(`No position exists for ${pair}`);
         }
 
-        const pnl = position.type === 'BUY' ?
-            (currentPrice - position.entryPrice) * position.quantity :
-            (position.entryPrice - currentPrice) * position.quantity;
+        const pnl = (currentPrice - position.entryPrice) * position.quantity;
+        this.balance += currentPrice * position.quantity;
+        this.positions.delete(pair);
 
-        this.balance += (position.entryPrice * position.quantity) + pnl;
-        
         const trade: Trade = {
             pair,
             type: position.type,
@@ -79,7 +92,6 @@ class VirtualAccount {
         };
 
         this.tradeHistory.push(trade);
-        this.positions.delete(pair);
 
         // Log the trade
         logTrade({
@@ -87,7 +99,8 @@ class VirtualAccount {
             type: 'CLOSE',
             price: currentPrice,
             quantity: position.quantity,
-            pnl
+            takeProfit: position.takeProfit,
+            stopLoss: position.stopLoss
         });
 
         return trade;

@@ -3,6 +3,7 @@ const binanceService = require('./services/binanceService');
 const indicatorService = require('./services/indicatorService');
 const virtualAccount = require('./models/VirtualAccount');
 const { logError, logger } = require('./utils/logger');
+const webSocketService = require('./services/webSocketService');
 
 // Store price history for each pair
 const priceHistory = new Map();
@@ -56,24 +57,79 @@ const processPriceData = (data) => {
                     balance: virtualAccount.balance
                 });
 
-                // Trading logic based on indicators
+                // Trading logic based on indicators and selected strategy
                 if (!virtualAccount.positions.has(symbol)) {  // Only trade if no position exists
-                    if (analysis.signals.includes('RSI_OVERSOLD') && analysis.signals.includes('ABOVE_EMA50')) {
-                        try {
-                            const position = virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
-                            logger.info(`Opened BUY position for ${symbol}:`, position);
-                        } catch (error) {
-                            logger.warn(`Failed to open BUY position: ${error.message}`);
+                    const settings = webSocketService.getCurrentSettings();
+                    
+                    // BB + RSI Strategy
+                    if (settings.enabledStrategies.includes('BB_RSI')) {
+                        if (analysis.signals.includes('BB_LOWER_TOUCH') && analysis.signals.includes('RSI_OVERSOLD')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
+                                logger.info(`[BB_RSI] Opened BUY position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open BUY position: ${error.message}`);
+                            }
+                        }
+                        else if (analysis.signals.includes('BB_UPPER_TOUCH') && analysis.signals.includes('RSI_OVERBOUGHT')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
+                                logger.info(`[BB_RSI] Opened SELL position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open SELL position: ${error.message}`);
+                            }
                         }
                     }
-                    else if (analysis.signals.includes('RSI_OVERBOUGHT') && analysis.signals.includes('BELOW_EMA50')) {
-                        try {
-                            const position = virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
-                            logger.info(`Opened SELL position for ${symbol}:`, position);
-                        } catch (error) {
-                            logger.warn(`Failed to open SELL position: ${error.message}`);
+
+                    // Support/Resistance + Volume Strategy
+                    if (settings.enabledStrategies.includes('SR_VOLUME')) {
+                        if (analysis.signals.includes('AT_SUPPORT') && analysis.signals.includes('HIGH_VOLUME')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
+                                logger.info(`[SR_VOLUME] Opened BUY position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open BUY position: ${error.message}`);
+                            }
+                        }
+                        else if (analysis.signals.includes('AT_RESISTANCE') && analysis.signals.includes('HIGH_VOLUME')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
+                                logger.info(`[SR_VOLUME] Opened SELL position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open SELL position: ${error.message}`);
+                            }
                         }
                     }
+
+                    // Ichimoku Strategy
+                    if (settings.enabledStrategies.includes('ICHIMOKU')) {
+                        if (analysis.signals.includes('ICHIMOKU_BULLISH')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'BUY', parseFloat(closePrice));
+                                logger.info(`[ICHIMOKU] Opened BUY position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open BUY position: ${error.message}`);
+                            }
+                        }
+                        else if (analysis.signals.includes('ICHIMOKU_BEARISH')) {
+                            try {
+                                const position = virtualAccount.openPosition(symbol, 'SELL', parseFloat(closePrice));
+                                logger.info(`[ICHIMOKU] Opened SELL position for ${symbol}:`, position);
+                            } catch (error) {
+                                logger.warn(`Failed to open SELL position: ${error.message}`);
+                            }
+                        }
+                    }
+
+                    if (process.env.LOG_LEVEL === 'debug') {
+                        logger.debug(`${symbol} Analysis:`, {
+                            price: closePrice,
+                            indicators: analysis,
+                            enabledStrategies: settings.enabledStrategies
+                        });
+                    }
+                } else {
+                    logger.debug('Position already exists for', symbol);
                 }
             } else {
                 logger.debug('Trading is disabled');

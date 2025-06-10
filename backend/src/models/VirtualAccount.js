@@ -6,6 +6,16 @@ class VirtualAccount {
         this.balance = initialBalance;
         this.positions = new Map();
         this.tradeHistory = [];
+        this.settings = {
+            timeframe: '1m',
+            riskRewardRatio: TRADING_PARAMS.RISK_REWARD_RATIO,
+            strategy: 'BB_RSI',
+            enabledStrategies: ['BB_RSI', 'SR_VOLUME', 'ICHIMOKU']
+        };
+    }
+
+    updateSettings(settings) {
+        this.settings = settings;
     }
 
     // Open a new position
@@ -19,16 +29,20 @@ class VirtualAccount {
             throw new Error('Insufficient balance');
         }
 
+        // Calculate SL and TP based on settings.riskRewardRatio
+        const slPercentage = TRADING_PARAMS.SL_PERCENTAGE;
+        const tpPercentage = slPercentage * this.settings.riskRewardRatio;
+
         const position = {
             type,
             entryPrice: price,
             quantity,
             takeProfit: type === 'BUY' ? 
-                price * (1 + TRADING_PARAMS.TP_PERCENTAGE / 100) :
-                price * (1 - TRADING_PARAMS.TP_PERCENTAGE / 100),
+                price * (1 + tpPercentage / 100) :
+                price * (1 - tpPercentage / 100),
             stopLoss: type === 'BUY' ?
-                price * (1 - TRADING_PARAMS.SL_PERCENTAGE / 100) :
-                price * (1 + TRADING_PARAMS.SL_PERCENTAGE / 100),
+                price * (1 - slPercentage / 100) :
+                price * (1 + slPercentage / 100),
             openTime: new Date()
         };
 

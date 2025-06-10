@@ -4,7 +4,7 @@ import path from 'path';
 const logDir = path.join(__dirname, '../../logs');
 
 const logger = winston.createLogger({
-  level: 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
@@ -25,5 +25,23 @@ const logger = winston.createLogger({
     })
   ]
 });
+
+export const logError = (error: Error): void => {
+  logger.error('Error:', {
+    message: error.message,
+    stack: error.stack
+  });
+};
+
+export const logTrade = (trade: {
+  pair: string;
+  type: string;
+  price: number;
+  quantity: number;
+  takeProfit: number;
+  stopLoss: number;
+}): void => {
+  logger.info('Trade:', trade);
+};
 
 export { logger }; 

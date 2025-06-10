@@ -58,7 +58,9 @@ export class WebSocketService extends EventEmitter {
   private symbolData: Map<string, SymbolData> = new Map();
   private currentSettings: TradingSettings = {
     timeframe: '1m',
-    riskRewardRatio: 2
+    riskRewardRatio: 1.5,
+    strategy: 'BB_RSI',
+    enabledStrategies: ['BB_RSI', 'SR_VOLUME', 'ICHIMOKU']
   };
   private accountUpdateInterval: NodeJS.Timeout | null = null;
 
@@ -139,6 +141,9 @@ export class WebSocketService extends EventEmitter {
     
     // Update current settings
     this.currentSettings = settings;
+
+    // Update VirtualAccount settings
+    virtualAccount.updateSettings(settings);
 
     // Reconnect to Binance with new timeframe if it changed
     if (this.ws && settings.timeframe !== this.currentSettings.timeframe) {

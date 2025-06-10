@@ -26,7 +26,7 @@ exports.INDICATORS = {
 // Trading parameters
 exports.TRADING_PARAMS = {
     DEFAULT_QUANTITY: 0.001,  // Default trading quantity
-    TP_PERCENTAGE: 2.0,      // Take profit 2% (R/R = 2:1)
+    TP_PERCENTAGE: 1.5,      // Take profit 1.5% (R/R = 1.5:1)
     SL_PERCENTAGE: 1.0,      // Stop loss 1%
-    RISK_REWARD_RATIO: 2     // Risk/Reward ratio
+    RISK_REWARD_RATIO: 1.5   // Risk/Reward ratio
 }; 
