@@ -4,6 +4,8 @@ export interface PriceData {
     change: number;      // Change in current minute
     change1h: number;    // Change in last 1 hour
     change24h: number;   // Change in last 24 hours
+    timestamp: number;   // Unix timestamp in milliseconds
+    lastUpdate: number;  // Last time this price was updated
 }
 
 export interface Position {
@@ -24,6 +26,6 @@ export interface AccountData {
 export interface TradingSettings {
     timeframe: string;
     riskRewardRatio: number;
-    strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+    strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
     enabledStrategies: string[];
 } 

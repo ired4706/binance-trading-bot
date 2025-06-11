@@ -16,11 +16,11 @@ import {
 interface TradingSettingsProps {
   timeframe: string;
   riskRewardRatio: number;
-  strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+  strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
   enabledStrategies: string[];
   onTimeframeChange: (timeframe: string) => void;
   onRiskRewardRatioChange: (ratio: number) => void;
-  onStrategyChange: (strategy: 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => void;
+  onStrategyChange: (strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => void;
   onEnabledStrategiesChange: (strategies: string[]) => void;
 }
 
@@ -41,7 +41,8 @@ const riskRewardRatios = [
 ];
 
 const strategies = [
-  { value: 'RSI_EMA', label: 'RSI + EMA Strategy' },
+  { value: 'RSI_EMA50', label: 'RSI + EMA50 (Short-term)' },
+  { value: 'RSI_EMA200', label: 'RSI + EMA200 (Long-term)' },
   { value: 'BB_RSI', label: 'Bollinger Bands + RSI' },
   { value: 'SR_VOLUME', label: 'Support/Resistance + Volume' },
   { value: 'ICHIMOKU', label: 'Ichimoku Cloud' },
@@ -66,7 +67,7 @@ export const TradingSettings: React.FC<TradingSettingsProps> = ({
   };
 
   const handleStrategyChange = (event: SelectChangeEvent) => {
-    onStrategyChange(event.target.value as 'RSI_EMA' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU');
+    onStrategyChange(event.target.value as 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU');
   };
 
   const handleStrategyToggle = (strategyValue: string) => {
