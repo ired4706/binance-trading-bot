@@ -93,7 +93,11 @@ router.post('/run', async (req: Request, res: Response) => {
       stopLoss: config.stopLoss || 2,
       takeProfit: config.takeProfit || 3,
       maxPositions: config.maxPositions || 1,
-      slippage: config.slippage || 0.1
+      slippage: config.slippage || 0.1,
+      tradingFees: config.tradingFees || 0.1,
+      makerFees: config.makerFees || 0.075,
+      takerFees: config.takerFees || 0.1,
+      useMakerFees: config.useMakerFees || false
     };
 
     // Validate config values

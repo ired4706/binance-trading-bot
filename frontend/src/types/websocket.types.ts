@@ -6,6 +6,7 @@ export interface PriceData {
     change24h: number;   // Change in last 24 hours
     timestamp: number;   // Unix timestamp in milliseconds
     lastUpdate: number;  // Last time this price was updated
+    changePercent: number;
 }
 
 export interface Position {
@@ -16,6 +17,7 @@ export interface Position {
     currentPrice: number;
     quantity: number;
     pnl: number;
+    pnlPercent: number;
 }
 
 export interface AccountData {
@@ -26,6 +28,11 @@ export interface AccountData {
 export interface TradingSettings {
     timeframe: string;
     riskRewardRatio: number;
-    strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+    strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE';
     enabledStrategies: string[];
+}
+
+export interface WebSocketMessage {
+    type: 'price' | 'account' | 'settings';
+    data: PriceData | AccountData | TradingSettings;
 } 

@@ -43,9 +43,18 @@ const TIME_RANGES = [
   { value: 'custom', label: 'Tùy chỉnh', days: 0 }
 ];
 
-const STRATEGIES = [
-  { value: 'RSI_EMA50', label: 'RSI + EMA50', description: 'Kết hợp RSI momentum với EMA50 trend filter' },
-  { value: 'BB_RSI', label: 'Bollinger Bands + RSI', description: 'Sử dụng Bollinger Bands cho volatility và RSI cho momentum' }
+const strategyOptions = [
+  { value: 'RSI_EMA50', label: 'RSI + EMA50 Strategy', description: 'Kết hợp RSI momentum với EMA50 trend filter' },
+  { value: 'RSI_EMA200', label: 'RSI + EMA200 Strategy', description: 'Kết hợp RSI momentum với EMA200 trend filter' },
+  { value: 'BB_RSI', label: 'Bollinger Bands + RSI Strategy', description: 'Sử dụng Bollinger Bands cho volatility và RSI cho momentum' },
+  { value: 'SR_VOLUME', label: 'Support/Resistance + Volume Strategy', description: 'Kết hợp support/resistance levels với volume analysis' },
+  { value: 'ICHIMOKU', label: 'Ichimoku Strategy', description: 'Sử dụng Ichimoku Cloud cho trend analysis' },
+  { value: 'MACD_VOLUME', label: 'MACD + Volume Strategy', description: 'Kết hợp MACD trend detection với volume confirmation' },
+  { value: 'ATR_DYNAMIC', label: 'ATR Dynamic Strategy', description: 'Sử dụng ATR cho dynamic stop loss và volatility analysis' },
+  { value: 'MTF_TREND', label: 'Multi-Timeframe Trend Strategy', description: 'Phân tích trend trên nhiều khung thời gian' },
+  { value: 'STOCHASTIC_RSI', label: 'Stochastic + RSI Mean Reversion', description: 'Mean reversion strategy kết hợp Stochastic và RSI divergence' },
+  { value: 'BB_SQUEEZE', label: 'Bollinger Bands Squeeze Strategy', description: 'Phát hiện market compression và breakout opportunities' },
+  { value: 'SUPPORT_RESISTANCE', label: 'Support/Resistance Breakout Strategy', description: 'Xác định key levels và breakout/retest signals' }
 ];
 
 const DEFAULT_CONFIG = {
@@ -54,7 +63,11 @@ const DEFAULT_CONFIG = {
   stopLoss: 2,
   takeProfit: 3,
   maxPositions: 1,
-  slippage: 0.1
+  slippage: 0.1,
+  tradingFees: 0.1,
+  makerFees: 0.075,
+  takerFees: 0.1,
+  useMakerFees: false
 };
 
 export const BacktestPanel: React.FC = () => {
@@ -71,7 +84,13 @@ export const BacktestPanel: React.FC = () => {
     initialBalance: 10000,
     positionSize: 10,
     stopLoss: 2,
-    takeProfit: 3
+    takeProfit: 3,
+    maxPositions: 1,
+    slippage: 0.1,
+    tradingFees: 0.1,
+    makerFees: 0.075,
+    takerFees: 0.1,
+    useMakerFees: false
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +232,7 @@ export const BacktestPanel: React.FC = () => {
                       '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#90caf9' }
                     }}
                   >
-                    {STRATEGIES.map(opt => (
+                    {strategyOptions.map(opt => (
                       <MenuItem key={opt.value} value={opt.value}>
                         <span>
                           <span style={{ fontWeight: 500, color: '#ffffff' }}>{opt.label}</span>
@@ -409,6 +428,69 @@ export const BacktestPanel: React.FC = () => {
                   }}
                 />
               </Grid>
+
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Slippage (%)"
+                  name="slippage"
+                  type="number"
+                  value={config.slippage}
+                  onChange={handleChange}
+                  inputProps={{ min: 0.01, step: 0.01 }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: '#ffffff',
+                      '& fieldset': { borderColor: '#555' },
+                      '&:hover fieldset': { borderColor: '#90caf9' },
+                      '&.Mui-focused fieldset': { borderColor: '#90caf9' }
+                    },
+                    '& .MuiInputLabel-root': { color: '#ffffff' }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Taker Fees (%)"
+                  name="takerFees"
+                  type="number"
+                  value={config.takerFees}
+                  onChange={handleChange}
+                  inputProps={{ min: 0.01, step: 0.01 }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: '#ffffff',
+                      '& fieldset': { borderColor: '#555' },
+                      '&:hover fieldset': { borderColor: '#90caf9' },
+                      '&.Mui-focused fieldset': { borderColor: '#90caf9' }
+                    },
+                    '& .MuiInputLabel-root': { color: '#ffffff' }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Maker Fees (%)"
+                  name="makerFees"
+                  type="number"
+                  value={config.makerFees}
+                  onChange={handleChange}
+                  inputProps={{ min: 0.01, step: 0.01 }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: '#ffffff',
+                      '& fieldset': { borderColor: '#555' },
+                      '&:hover fieldset': { borderColor: '#90caf9' },
+                      '&.Mui-focused fieldset': { borderColor: '#90caf9' }
+                    },
+                    '& .MuiInputLabel-root': { color: '#ffffff' }
+                  }}
+                />
+              </Grid>
             </Grid>
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
@@ -453,18 +535,21 @@ export const BacktestPanel: React.FC = () => {
             <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid item xs={12} md={3}>
                 <Card sx={{ 
-                  backgroundColor: result.performance.totalReturn >= 0 ? '#2e7d32' : '#d32f2f',
+                  backgroundColor: result.performance.netTotalReturn >= 0 ? '#2e7d32' : '#d32f2f',
                   color: '#ffffff'
                 }}>
                   <CardContent sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      {formatCurrency(result.performance.totalReturn)}
+                      {formatCurrency(result.performance.netTotalReturn)}
                     </Typography>
                     <Typography variant="body2">
-                      Lợi nhuận tổng
+                      Lợi nhuận ròng (sau phí)
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                      {formatPercentage(result.performance.totalReturnPercentage)}
+                      {formatPercentage(result.performance.netTotalReturnPercentage)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Gross: {formatCurrency(result.performance.totalReturn)} ({formatPercentage(result.performance.totalReturnPercentage)})
                     </Typography>
                   </CardContent>
                 </Card>
@@ -480,10 +565,13 @@ export const BacktestPanel: React.FC = () => {
                       Tổng số lệnh
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                      {formatPercentage(result.performance.winRate)}
+                      {formatPercentage(result.performance.netWinRate)}
                     </Typography>
                     <Typography variant="body2">
-                      Tỷ lệ thắng
+                      Tỷ lệ thắng (ròng)
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Gross: {formatPercentage(result.performance.winRate)}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -493,13 +581,16 @@ export const BacktestPanel: React.FC = () => {
                 <Card sx={{ backgroundColor: '#ed6c02', color: '#ffffff' }}>
                   <CardContent sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      {formatCurrency(result.performance.maxDrawdown)}
+                      {formatCurrency(result.performance.netMaxDrawdown)}
                     </Typography>
                     <Typography variant="body2">
-                      Drawdown tối đa
+                      Drawdown tối đa (ròng)
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                      {formatPercentage(result.performance.maxDrawdownPercentage)}
+                      {formatPercentage(result.performance.netMaxDrawdownPercentage)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Gross: {formatCurrency(result.performance.maxDrawdown)} ({formatPercentage(result.performance.maxDrawdownPercentage)})
                     </Typography>
                   </CardContent>
                 </Card>
@@ -509,16 +600,92 @@ export const BacktestPanel: React.FC = () => {
                 <Card sx={{ backgroundColor: '#0288d1', color: '#ffffff' }}>
                   <CardContent sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      {result.performance.profitFactor.toFixed(2)}
+                      {result.performance.netProfitFactor.toFixed(2)}
                     </Typography>
                     <Typography variant="body2">
-                      Profit Factor
+                      Profit Factor (ròng)
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
-                      {result.performance.sharpeRatio.toFixed(2)}
+                      {result.performance.netSharpeRatio.toFixed(2)}
                     </Typography>
                     <Typography variant="body2">
-                      Sharpe Ratio
+                      Sharpe Ratio (ròng)
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Gross: PF {result.performance.profitFactor.toFixed(2)} | SR {result.performance.sharpeRatio.toFixed(2)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Advanced Metrics */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} md={3}>
+                <Card sx={{ backgroundColor: '#7b1fa2', color: '#ffffff' }}>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {result.performance.calmarRatio.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2">
+                      Calmar Ratio
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Return/Drawdown ratio
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <Card sx={{ backgroundColor: '#388e3c', color: '#ffffff' }}>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {result.performance.sortinoRatio.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2">
+                      Sortino Ratio
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.8 }}>
+                      Downside risk adjusted
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <Card sx={{ backgroundColor: '#f57c00', color: '#ffffff' }}>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {formatCurrency(result.performance.totalFees)}
+                    </Typography>
+                    <Typography variant="body2">
+                      Tổng phí giao dịch
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
+                      {formatCurrency(result.performance.totalSlippage)}
+                    </Typography>
+                    <Typography variant="body2">
+                      Tổng slippage
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={3}>
+                <Card sx={{ backgroundColor: '#d84315', color: '#ffffff' }}>
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {result.performance.maxConsecutiveWins}
+                    </Typography>
+                    <Typography variant="body2">
+                      Thắng liên tiếp tối đa
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>
+                      {result.performance.maxConsecutiveLosses}
+                    </Typography>
+                    <Typography variant="body2">
+                      Thua liên tiếp tối đa
                     </Typography>
                   </CardContent>
                 </Card>
@@ -541,28 +708,30 @@ export const BacktestPanel: React.FC = () => {
                         <TableCell sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>Loại</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>Giá vào</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>Giá ra</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>PNL ($)</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>PNL (%)</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>PNL ròng ($)</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>PNL ròng (%)</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>Phí + Slippage</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>Lý do đóng</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {result.trades.map((trade: any, idx: number) => {
-                        // Determine exit reason
-                        const priceChange = ((trade.exitPrice - trade.entryPrice) / trade.entryPrice) * 100;
-                        let exitReason = 'Tín hiệu SELL';
-                        if (priceChange <= -config.stopLoss) {
-                          exitReason = 'Stop Loss';
-                        } else if (priceChange >= config.takeProfit) {
-                          exitReason = 'Take Profit';
-                        }
+                        const totalCosts = trade.entryFees + trade.exitFees + trade.entrySlippage + trade.exitSlippage;
+                        
+                        // Map exit reason to Vietnamese
+                        const exitReasonMap: { [key: string]: string } = {
+                          'SIGNAL': 'Tín hiệu SELL',
+                          'STOP_LOSS': 'Stop Loss',
+                          'TAKE_PROFIT': 'Take Profit',
+                          'END_OF_DATA': 'Kết thúc dữ liệu'
+                        };
                         
                         return (
                           <TableRow 
                             key={idx}
                             sx={{ 
-                              backgroundColor: trade.pnl >= 0 ? '#1b5e20' : '#b71c1c',
-                              '&:hover': { backgroundColor: trade.pnl >= 0 ? '#2e7d32' : '#d32f2f' },
+                              backgroundColor: trade.netPnl >= 0 ? '#1b5e20' : '#b71c1c',
+                              '&:hover': { backgroundColor: trade.netPnl >= 0 ? '#2e7d32' : '#d32f2f' },
                               borderColor: '#555'
                             }}
                           >
@@ -579,16 +748,19 @@ export const BacktestPanel: React.FC = () => {
                             <TableCell align="right" sx={{ color: '#ffffff', borderColor: '#555' }}>{formatCurrency(trade.entryPrice)}</TableCell>
                             <TableCell align="right" sx={{ color: '#ffffff', borderColor: '#555' }}>{formatCurrency(trade.exitPrice)}</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>
-                              {formatCurrency(trade.pnl)}
+                              {formatCurrency(trade.netPnl)}
                             </TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'bold', color: '#ffffff', borderColor: '#555' }}>
-                              {formatPercentage(trade.pnlPercentage)}
+                              {formatPercentage(trade.netPnlPercentage)}
+                            </TableCell>
+                            <TableCell align="right" sx={{ color: '#ffffff', borderColor: '#555' }}>
+                              {formatCurrency(totalCosts)}
                             </TableCell>
                             <TableCell align="right" sx={{ color: '#ffffff', borderColor: '#555' }}>
                               <Chip 
-                                label={exitReason} 
+                                label={exitReasonMap[trade.exitReason] || trade.exitReason} 
                                 size="small"
-                                color={exitReason === 'Stop Loss' ? 'error' : exitReason === 'Take Profit' ? 'success' : 'default'}
+                                color={exitReasonMap[trade.exitReason] === 'Stop Loss' ? 'error' : exitReasonMap[trade.exitReason] === 'Take Profit' ? 'success' : 'default'}
                                 variant="outlined"
                               />
                             </TableCell>

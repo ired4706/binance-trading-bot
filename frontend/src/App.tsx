@@ -5,22 +5,42 @@ import { PriceData, AccountData, TradingSettings as TradingSettingsType } from '
 import { TradingSettings } from './components/TradingSettings';
 import InfoIcon from '@mui/icons-material/Info';
 import { BacktestPanel } from './components/BacktestPanel';
+import { PriceTable } from './components/PriceTable/PriceTable';
+import { AccountInfo } from './components/AccountInfo/AccountInfo';
+
+const initialCandleCounts = {
+  'RSI_EMA50': 0,
+  'RSI_EMA200': 0,
+  'BB_RSI': 0,
+  'SR_VOLUME': 0,
+  'ICHIMOKU': 0,
+  'MACD_VOLUME': 0,
+  'ATR_DYNAMIC': 0,
+  'MTF_TREND': 0,
+  'STOCHASTIC_RSI': 0,
+  'BB_SQUEEZE': 0,
+  'SUPPORT_RESISTANCE': 0
+};
+
+const timeframeMultiplier = {
+  '1m': 1,
+  '3m': 3,
+  '5m': 5,
+  '15m': 15,
+  '30m': 30,
+  '1h': 60,
+  '4h': 240,
+};
 
 function App() {
   const [prices, setPrices] = useState<PriceData[]>([]);
   const [account, setAccount] = useState<AccountData>({ balance: 0, positions: [] });
-  const [candleCounts, setCandleCounts] = useState<Record<string, number>>({
-    'RSI_EMA50': 0,
-    'RSI_EMA200': 0,
-    'BB_RSI': 0,
-    'SR_VOLUME': 0,
-    'ICHIMOKU': 0
-  });
+  const [candleCounts, setCandleCounts] = useState<Record<string, number>>(initialCandleCounts);
   const [settings, setSettings] = useState<TradingSettingsType>({
     timeframe: '1m',
     riskRewardRatio: 1.5,
     strategy: 'RSI_EMA50',
-    enabledStrategies: ['RSI_EMA50', 'RSI_EMA200', 'BB_RSI', 'SR_VOLUME', 'ICHIMOKU']
+    enabledStrategies: ['RSI_EMA50', 'RSI_EMA200', 'BB_RSI', 'SR_VOLUME', 'ICHIMOKU', 'MACD_VOLUME', 'ATR_DYNAMIC', 'MTF_TREND', 'STOCHASTIC_RSI', 'BB_SQUEEZE', 'SUPPORT_RESISTANCE']
   });
 
   const candleDataRef = useRef<Record<string, PriceData[]>>({
@@ -28,7 +48,13 @@ function App() {
     'RSI_EMA200': [],
     'BB_RSI': [],
     'SR_VOLUME': [],
-    'ICHIMOKU': []
+    'ICHIMOKU': [],
+    'MACD_VOLUME': [],
+    'ATR_DYNAMIC': [],
+    'MTF_TREND': [],
+    'STOCHASTIC_RSI': [],
+    'BB_SQUEEZE': [],
+    'SUPPORT_RESISTANCE': []
   });
 
   const timeframeInMs = useMemo(() => ({
@@ -59,18 +85,10 @@ function App() {
       ...prev,
       [strategy]: prev[strategy] + 1
     }));
-  }, []);
+  }, [settings.timeframe, settings.strategy]);
 
   const getRequiredCandles = () => {
-    const timeframeMultiplier = {
-      '1m': 1,
-      '3m': 3,
-      '5m': 5,
-      '15m': 15,
-      '30m': 30,
-      '1h': 60,
-      '4h': 240,
-    }[settings.timeframe] || 1;
+    const multiplier = timeframeMultiplier[settings.timeframe as keyof typeof timeframeMultiplier] || 1;
 
     let baseCandles = 0;
     switch(settings.strategy) {
@@ -86,11 +104,29 @@ function App() {
       case 'ICHIMOKU':
         baseCandles = 52; // For Ichimoku (26 * 2)
         break;
+      case 'MACD_VOLUME':
+        baseCandles = 26; // For MACD
+        break;
+      case 'ATR_DYNAMIC':
+        baseCandles = 14; // For ATR
+        break;
+      case 'MTF_TREND':
+        baseCandles = 50; // For multi-timeframe analysis
+        break;
+      case 'STOCHASTIC_RSI':
+        baseCandles = 40; // For Stochastic + RSI
+        break;
+      case 'BB_SQUEEZE':
+        baseCandles = 50; // For Bollinger Bands Squeeze
+        break;
+      case 'SUPPORT_RESISTANCE':
+        baseCandles = 60; // For Support/Resistance analysis
+        break;
       default:
         baseCandles = 100;
     }
     
-    return Math.ceil(baseCandles / timeframeMultiplier);
+    return Math.ceil(baseCandles / multiplier);
   };
 
   const getTotalCollectedCandles = (strategy: string) => {
@@ -113,31 +149,42 @@ function App() {
         return " (Không phù hợp cho Scalping: Ichimoku cần nhiều thời gian để tạo tín hiệu)";
       case 'SR_VOLUME':
         return " (Hỗ trợ tốt cho Scalping: Xác định vùng hỗ trợ/kháng cự quan trọng kết hợp volume)";
+      case 'MACD_VOLUME':
+        return " (Phù hợp cho Day Trading: MACD xác định xu hướng, Volume xác nhận momentum. Khuyến nghị timeframe 15m-1h)";
+      case 'ATR_DYNAMIC':
+        return " (Linh hoạt cho nhiều timeframe: ATR thích ứng với volatility, phù hợp cho cả scalping và swing trading)";
+      case 'MTF_TREND':
+        return " (Tối ưu cho Swing Trading: Phân tích đa khung thời gian, xác định xu hướng chính. Khuyến nghị timeframe H4-D1)";
+      case 'STOCHASTIC_RSI':
+        return " (Mean Reversion Strategy: Tối ưu cho thị trường sideway, tìm điểm reversal. Khuyến nghị timeframe 5m-15m)";
+      case 'BB_SQUEEZE':
+        return " (Breakout Strategy: Phát hiện market compression và breakout. Phù hợp cho volatile markets, timeframe 5m-1h)";
+      case 'SUPPORT_RESISTANCE':
+        return " (Market Structure Strategy: Xác định key levels và breakout/retest. Phù hợp cho swing trading, timeframe 1h-4h)";
       default:
         return "";
     }
   };
 
   const getEstimatedTime = (strategy: string) => {
-    const timeMultiplier = {
-      '1m': 1,
-      '3m': 3,
-      '5m': 5,
-      '15m': 15,
-      '30m': 30,
-      '1h': 60,
-      '4h': 240,
-    }[settings.timeframe] || 1;
+    // Forcing a re-evaluation of this function block
+    const multiplier = timeframeMultiplier[settings.timeframe as keyof typeof timeframeMultiplier] || 1;
 
     const recommendedCandles = {
       'RSI_EMA50': 150,  // 2.5 giờ với khung 1m
       'RSI_EMA200': 400, // 6.5 giờ với khung 1m
       'BB_RSI': 60,      // 1 giờ với khung 1m
       'ICHIMOKU': 52,    // Theo yêu cầu cơ bản
-      'SR_VOLUME': 100   // Support/Resistance cần ít nhất 100 nến
+      'SR_VOLUME': 100,  // Support/Resistance cần ít nhất 100 nến
+      'MACD_VOLUME': 80, // MACD cần ít nhất 80 nến
+      'ATR_DYNAMIC': 50, // ATR cần ít nhất 50 nến
+      'MTF_TREND': 120,  // Multi-timeframe cần nhiều dữ liệu hơn
+      'STOCHASTIC_RSI': 80, // Stochastic + RSI cần ít nhất 80 nến
+      'BB_SQUEEZE': 100, // BB Squeeze cần ít nhất 100 nến
+      'SUPPORT_RESISTANCE': 120 // Support/Resistance cần ít nhất 120 nến
     }[strategy] || 100;
 
-    const totalMinutes = recommendedCandles * timeMultiplier;
+    const totalMinutes = recommendedCandles * multiplier;
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
 
@@ -214,6 +261,66 @@ function App() {
           timeframes: 'H4, D1',
           pros: ['Xác định vùng giá rộng'],
           tips: 'Thích hợp cho thị trường sideway dài hạn'
+        }
+      },
+      'STOCHASTIC_RSI': {
+        scalping: {
+          suitability: 'Phù hợp cho mean reversion',
+          timeframes: '5m, 15m',
+          pros: ['Tốt cho thị trường sideway', 'Phát hiện divergence'],
+          tips: 'Kết hợp với volume để xác nhận reversal'
+        },
+        dayTrading: {
+          suitability: 'Rất phù hợp',
+          timeframes: '15m, 30m',
+          pros: ['Mean reversion hiệu quả', 'Divergence signals'],
+          tips: 'Tối ưu cho range-bound markets'
+        },
+        swingTrading: {
+          suitability: 'Phù hợp có điều kiện',
+          timeframes: '1h, 4h',
+          pros: ['Xác định reversal points'],
+          tips: 'Cần thị trường có range rõ ràng'
+        }
+      },
+      'BB_SQUEEZE': {
+        scalping: {
+          suitability: 'Phù hợp cho breakout',
+          timeframes: '5m, 15m',
+          pros: ['Phát hiện market compression', 'Breakout signals'],
+          tips: 'Chờ squeeze completion trước khi vào lệnh'
+        },
+        dayTrading: {
+          suitability: 'Rất phù hợp',
+          timeframes: '15m, 1h',
+          pros: ['Breakout detection', 'Volume confirmation'],
+          tips: 'Tối ưu cho volatile markets'
+        },
+        swingTrading: {
+          suitability: 'Phù hợp',
+          timeframes: '1h, 4h',
+          pros: ['Major breakout signals'],
+          tips: 'Cần patience để chờ squeeze'
+        }
+      },
+      'SUPPORT_RESISTANCE': {
+        scalping: {
+          suitability: 'Không phù hợp',
+          timeframes: '1h, 4h',
+          pros: [],
+          tips: 'Cần thời gian để xác định levels'
+        },
+        dayTrading: {
+          suitability: 'Phù hợp',
+          timeframes: '1h, 4h',
+          pros: ['Key level identification', 'Breakout/retest signals'],
+          tips: 'Tối ưu cho swing trading'
+        },
+        swingTrading: {
+          suitability: 'Rất phù hợp',
+          timeframes: '4h, D1',
+          pros: ['Major support/resistance', 'Trend continuation'],
+          tips: 'Cần historical data để xác định levels'
         }
       }
     };
@@ -343,13 +450,7 @@ function App() {
     console.log('Timeframe changing to:', timeframe);
     const newSettings = { ...settings, timeframe };
     setSettings(newSettings);
-    setCandleCounts({
-      'RSI_EMA50': 0,
-      'RSI_EMA200': 0,
-      'BB_RSI': 0,
-      'SR_VOLUME': 0,
-      'ICHIMOKU': 0
-    });
+    setCandleCounts(initialCandleCounts);
     wsService.updateSettings(newSettings);
   };
 
@@ -359,7 +460,7 @@ function App() {
     wsService.updateSettings(newSettings);
   };
 
-  const handleStrategyChange = (strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => {
+  const handleStrategyChange = (strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE') => {
     console.log('Strategy changing to:', strategy);
     const newSettings = { ...settings, strategy };
     setSettings(newSettings);
@@ -371,18 +472,6 @@ function App() {
     setSettings(newSettings);
     wsService.updateSettings(newSettings);
   };
-
-  const renderPriceChange = (change: number) => (
-    <TableCell 
-      align="right"
-      sx={{ 
-        color: change >= 0 ? 'success.main' : 'error.main',
-        fontWeight: 'medium'
-      }}
-    >
-      {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-    </TableCell>
-  );
 
   const [activeTab, setActiveTab] = useState(0);
 
@@ -424,93 +513,8 @@ function App() {
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
-            {/* Price Table */}
-            <Paper elevation={3} sx={{ p: 2, flex: 1 }}>
-              <Typography variant="h6" gutterBottom>
-                Prices
-              </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Symbol</TableCell>
-                      <TableCell align="right">Price</TableCell>
-                      <TableCell align="right">1m Change</TableCell>
-                      <TableCell align="right">1h Change</TableCell>
-                      <TableCell align="right">24h Change</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {prices.map((price) => (
-                      <TableRow key={price.symbol}>
-                        <TableCell>{price.symbol}</TableCell>
-                        <TableCell align="right">${price.price.toLocaleString()}</TableCell>
-                        {renderPriceChange(price.change)}
-                        {renderPriceChange(price.change1h)}
-                        {renderPriceChange(price.change24h)}
-                      </TableRow>
-                    ))}
-                    {prices.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} align="center">
-                          Waiting for price data...
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-
-            {/* Account Info */}
-            <Paper elevation={3} sx={{ p: 2, flex: 1 }}>
-              <Typography variant="h6" gutterBottom>
-                Account Balance: ${account.balance.toLocaleString()}
-              </Typography>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Positions
-              </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Symbol</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell align="right">Entry Price</TableCell>
-                      <TableCell align="right">Current Price</TableCell>
-                      <TableCell align="right">Quantity</TableCell>
-                      <TableCell align="right">PnL</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {account.positions.map((position) => (
-                      <TableRow key={position.id}>
-                        <TableCell>{position.symbol}</TableCell>
-                        <TableCell sx={{ color: position.type === 'BUY' ? 'success.main' : 'error.main' }}>
-                          {position.type}
-                        </TableCell>
-                        <TableCell align="right">${position.entryPrice.toLocaleString()}</TableCell>
-                        <TableCell align="right">${position.currentPrice.toLocaleString()}</TableCell>
-                        <TableCell align="right">{position.quantity}</TableCell>
-                        <TableCell 
-                          align="right"
-                          sx={{ color: position.pnl >= 0 ? 'success.main' : 'error.main' }}
-                        >
-                          ${position.pnl.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {account.positions.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} align="center">
-                          No open positions
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
+            <PriceTable prices={prices} />
+            <AccountInfo account={account} />
           </Box>
         </Box>
       )}

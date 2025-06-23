@@ -58,8 +58,8 @@ class VirtualAccount {
 
         // Log the trade
         logTrade({
-            pair,
-            type: 'OPEN',
+            symbol: pair,
+            type: type,
             price: position.entryPrice,
             quantity: position.quantity,
             takeProfit: position.takeProfit,
@@ -95,8 +95,8 @@ class VirtualAccount {
 
         // Log the trade
         logTrade({
-            pair,
-            type: 'CLOSE',
+            symbol: pair,
+            type: position.type === 'BUY' ? 'SELL' : 'BUY',
             price: currentPrice,
             quantity: position.quantity,
             takeProfit: position.takeProfit,

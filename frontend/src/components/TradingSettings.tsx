@@ -16,11 +16,11 @@ import {
 interface TradingSettingsProps {
   timeframe: string;
   riskRewardRatio: number;
-  strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU';
+  strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE';
   enabledStrategies: string[];
   onTimeframeChange: (timeframe: string) => void;
   onRiskRewardRatioChange: (ratio: number) => void;
-  onStrategyChange: (strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU') => void;
+  onStrategyChange: (strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE') => void;
   onEnabledStrategiesChange: (strategies: string[]) => void;
 }
 
@@ -40,12 +40,18 @@ const riskRewardRatios = [
   { value: 3, label: '3:1' },
 ];
 
-const strategies = [
-  { value: 'RSI_EMA50', label: 'RSI + EMA50 (Short-term)' },
-  { value: 'RSI_EMA200', label: 'RSI + EMA200 (Long-term)' },
+const strategyOptions = [
+  { value: 'RSI_EMA50', label: 'RSI + EMA50' },
+  { value: 'RSI_EMA200', label: 'RSI + EMA200' },
   { value: 'BB_RSI', label: 'Bollinger Bands + RSI' },
   { value: 'SR_VOLUME', label: 'Support/Resistance + Volume' },
-  { value: 'ICHIMOKU', label: 'Ichimoku Cloud' },
+  { value: 'ICHIMOKU', label: 'Ichimoku' },
+  { value: 'MACD_VOLUME', label: 'MACD + Volume' },
+  { value: 'ATR_DYNAMIC', label: 'ATR Dynamic' },
+  { value: 'MTF_TREND', label: 'Multi-Timeframe Trend' },
+  { value: 'STOCHASTIC_RSI', label: 'Stochastic + RSI Mean Reversion' },
+  { value: 'BB_SQUEEZE', label: 'Bollinger Bands Squeeze' },
+  { value: 'SUPPORT_RESISTANCE', label: 'Support/Resistance Breakout' }
 ];
 
 export const TradingSettings: React.FC<TradingSettingsProps> = ({
@@ -67,7 +73,7 @@ export const TradingSettings: React.FC<TradingSettingsProps> = ({
   };
 
   const handleStrategyChange = (event: SelectChangeEvent) => {
-    onStrategyChange(event.target.value as 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU');
+    onStrategyChange(event.target.value as 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE');
   };
 
   const handleStrategyToggle = (strategyValue: string) => {
@@ -121,7 +127,7 @@ export const TradingSettings: React.FC<TradingSettingsProps> = ({
               label="Primary Strategy"
               onChange={handleStrategyChange}
             >
-              {strategies.map((s) => (
+              {strategyOptions.map((s) => (
                 <MenuItem key={s.value} value={s.value}>
                   {s.label}
                 </MenuItem>
@@ -135,7 +141,7 @@ export const TradingSettings: React.FC<TradingSettingsProps> = ({
             Enabled Strategies
           </Typography>
           <FormGroup row>
-            {strategies.map((s) => (
+            {strategyOptions.map((s) => (
               <FormControlLabel
                 key={s.value}
                 control={
