@@ -14,15 +14,13 @@ import {
   Card,
   CardContent,
   Alert,
-  CircularProgress,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
-  ListItemText
+  Chip
 } from '@mui/material';
 
 const INTERVALS = [
@@ -57,17 +55,166 @@ const strategyOptions = [
   { value: 'SUPPORT_RESISTANCE', label: 'Support/Resistance Breakout Strategy', description: 'Xác định key levels và breakout/retest signals' }
 ];
 
-const DEFAULT_CONFIG = {
-  initialBalance: 10000,
-  positionSize: 10,
-  stopLoss: 2,
-  takeProfit: 3,
-  maxPositions: 1,
-  slippage: 0.1,
-  tradingFees: 0.1,
-  makerFees: 0.075,
-  takerFees: 0.1,
-  useMakerFees: false
+// Strategy recommendation logic
+const getStrategyRecommendations = (interval: string, timeRange: string) => {
+  const recommendations: Array<{
+    strategy: string;
+    label: string;
+    reason: string;
+    suitability: 'Excellent' | 'Good' | 'Fair' | 'Poor';
+    tradingStyle: string;
+    riskLevel: 'Low' | 'Medium' | 'High';
+  }> = [];
+
+  const intervalMinutes = {
+    '1m': 1,
+    '5m': 5,
+    '15m': 15,
+    '1h': 60,
+    '4h': 240
+  }[interval] || 5;
+
+  const timeRangeDays = {
+    '1d': 1,
+    '1w': 7,
+    '1m': 30,
+    '3m': 90,
+    '6m': 180,
+    '1y': 365
+  }[timeRange] || 30;
+
+  // Scalping strategies (1m-5m)
+  if (intervalMinutes <= 5) {
+    recommendations.push({
+      strategy: 'RSI_EMA50',
+      label: 'RSI + EMA50 Strategy',
+      reason: 'Tối ưu cho scalping với phản ứng nhanh, EMA50 filter trend ngắn hạn',
+      suitability: 'Excellent',
+      tradingStyle: 'Scalping',
+      riskLevel: 'High'
+    });
+
+    recommendations.push({
+      strategy: 'BB_RSI',
+      label: 'Bollinger Bands + RSI Strategy',
+      reason: 'Phát hiện volatility và momentum tốt cho timeframe nhỏ',
+      suitability: 'Good',
+      tradingStyle: 'Scalping',
+      riskLevel: 'High'
+    });
+
+    recommendations.push({
+      strategy: 'SR_VOLUME',
+      label: 'Support/Resistance + Volume Strategy',
+      reason: 'Xác định key levels nhanh chóng với volume confirmation',
+      suitability: 'Good',
+      tradingStyle: 'Scalping',
+      riskLevel: 'Medium'
+    });
+  }
+
+  // Day Trading strategies (5m-1h)
+  if (intervalMinutes >= 5 && intervalMinutes <= 60) {
+    recommendations.push({
+      strategy: 'MACD_VOLUME',
+      label: 'MACD + Volume Strategy',
+      reason: 'Trend detection mạnh mẽ với volume confirmation cho day trading',
+      suitability: 'Excellent',
+      tradingStyle: 'Day Trading',
+      riskLevel: 'Medium'
+    });
+
+    recommendations.push({
+      strategy: 'ATR_DYNAMIC',
+      label: 'ATR Dynamic Strategy',
+      reason: 'Dynamic stop loss thích ứng với volatility thị trường',
+      suitability: 'Good',
+      tradingStyle: 'Day Trading',
+      riskLevel: 'Medium'
+    });
+
+    recommendations.push({
+      strategy: 'STOCHASTIC_RSI',
+      label: 'Stochastic + RSI Mean Reversion',
+      reason: 'Mean reversion hiệu quả trong thị trường sideway',
+      suitability: 'Good',
+      tradingStyle: 'Day Trading',
+      riskLevel: 'Medium'
+    });
+  }
+
+  // Swing Trading strategies (1h-4h)
+  if (intervalMinutes >= 60) {
+    recommendations.push({
+      strategy: 'MTF_TREND',
+      label: 'Multi-Timeframe Trend Strategy',
+      reason: 'Phân tích trend đa khung thời gian cho swing trading',
+      suitability: 'Excellent',
+      tradingStyle: 'Swing Trading',
+      riskLevel: 'Low'
+    });
+
+    recommendations.push({
+      strategy: 'RSI_EMA200',
+      label: 'RSI + EMA200 Strategy',
+      reason: 'Trend filter dài hạn với momentum confirmation',
+      suitability: 'Good',
+      tradingStyle: 'Swing Trading',
+      riskLevel: 'Low'
+    });
+
+    recommendations.push({
+      strategy: 'ICHIMOKU',
+      label: 'Ichimoku Strategy',
+      reason: 'Cloud analysis mạnh mẽ cho trend identification',
+      suitability: 'Good',
+      tradingStyle: 'Swing Trading',
+      riskLevel: 'Low'
+    });
+  }
+
+  // Long-term strategies (3m+ time range)
+  if (timeRangeDays >= 90) {
+    recommendations.push({
+      strategy: 'SUPPORT_RESISTANCE',
+      label: 'Support/Resistance Breakout Strategy',
+      reason: 'Key levels analysis hiệu quả cho long-term trading',
+      suitability: 'Excellent',
+      tradingStyle: 'Position Trading',
+      riskLevel: 'Low'
+    });
+
+    recommendations.push({
+      strategy: 'BB_SQUEEZE',
+      label: 'Bollinger Bands Squeeze Strategy',
+      reason: 'Breakout detection từ market compression',
+      suitability: 'Good',
+      tradingStyle: 'Position Trading',
+      riskLevel: 'Medium'
+    });
+  }
+
+  // Volatile market strategies (short time ranges)
+  if (timeRangeDays <= 7) {
+    recommendations.push({
+      strategy: 'ATR_DYNAMIC',
+      label: 'ATR Dynamic Strategy',
+      reason: 'Dynamic risk management cho thị trường biến động',
+      suitability: 'Excellent',
+      tradingStyle: 'Volatile Market',
+      riskLevel: 'High'
+    });
+  }
+
+  // Remove duplicates and sort by suitability
+  const uniqueRecommendations = recommendations.filter((rec, index, self) => 
+    index === self.findIndex(r => r.strategy === rec.strategy)
+  );
+
+  return uniqueRecommendations.sort((a, b) => {
+    const suitabilityOrder = { 'Excellent': 4, 'Good': 3, 'Fair': 2, 'Poor': 1 };
+    return suitabilityOrder[b.suitability] - suitabilityOrder[a.suitability];
+  });
 };
 
 export const BacktestPanel: React.FC = () => {
@@ -92,6 +239,8 @@ export const BacktestPanel: React.FC = () => {
     takerFees: 0.1,
     useMakerFees: false
   });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [strategySuggestions, setStrategySuggestions] = useState<any[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setConfig({ ...config, [e.target.name]: Number(e.target.value) });
@@ -174,6 +323,31 @@ export const BacktestPanel: React.FC = () => {
     }
     
     return '';
+  };
+
+  const handleStrategySuggestion = () => {
+    const recommendations = getStrategyRecommendations(interval, timeRange);
+    setStrategySuggestions(recommendations);
+    setShowSuggestions(true);
+  };
+
+  const getSuitabilityColor = (suitability: string) => {
+    switch (suitability) {
+      case 'Excellent': return '#4caf50';
+      case 'Good': return '#90caf9';
+      case 'Fair': return '#ff9800';
+      case 'Poor': return '#f44336';
+      default: return '#ffffff';
+    }
+  };
+
+  const getRiskLevelColor = (riskLevel: string) => {
+    switch (riskLevel) {
+      case 'Low': return '#4caf50';
+      case 'Medium': return '#ff9800';
+      case 'High': return '#f44336';
+      default: return '#ffffff';
+    }
   };
 
   return (
@@ -290,6 +464,119 @@ export const BacktestPanel: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
+
+              {/* Strategy Suggestion Button */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleStrategySuggestion}
+                    startIcon={<span>🎯</span>}
+                    sx={{
+                      color: '#90caf9',
+                      borderColor: '#90caf9',
+                      '&:hover': {
+                        borderColor: '#64b5f6',
+                        backgroundColor: 'rgba(144, 202, 249, 0.1)'
+                      }
+                    }}
+                  >
+                    🎯 Gợi ý Chiến lược Phù hợp
+                  </Button>
+                </Box>
+              </Grid>
+
+              {/* Strategy Suggestions Display */}
+              {showSuggestions && strategySuggestions.length > 0 && (
+                <Grid item xs={12}>
+                  <Card sx={{ mt: 3, backgroundColor: '#1e1e1e', border: '1px solid #90caf9' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ color: '#90caf9', fontWeight: 'bold' }}>
+                        🎯 Gợi ý Chiến lược cho {interval} - {timeRange}
+                      </Typography>
+                      
+                      <Grid container spacing={2}>
+                        {strategySuggestions.slice(0, 6).map((rec, index) => (
+                          <Grid item xs={12} md={6} key={rec.strategy}>
+                            <Card sx={{ 
+                              backgroundColor: '#2d2d2d', 
+                              border: '1px solid #555',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                borderColor: '#90caf9',
+                                backgroundColor: '#3d3d3d'
+                              }
+                            }}
+                            onClick={() => {
+                              setStrategy(rec.strategy);
+                              setShowSuggestions(false);
+                            }}
+                            >
+                              <CardContent sx={{ p: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
+                                    {rec.label}
+                                  </Typography>
+                                  <Chip 
+                                    label={rec.suitability} 
+                                    size="small"
+                                    sx={{ 
+                                      backgroundColor: getSuitabilityColor(rec.suitability),
+                                      color: '#ffffff',
+                                      fontWeight: 'bold'
+                                    }}
+                                  />
+                                </Box>
+                                
+                                <Typography variant="body2" sx={{ color: '#aaa', mb: 1, fontSize: '0.875rem' }}>
+                                  {rec.reason}
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Chip 
+                                    label={rec.tradingStyle} 
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ 
+                                      borderColor: '#90caf9',
+                                      color: '#90caf9',
+                                      fontSize: '0.75rem'
+                                    }}
+                                  />
+                                  <Chip 
+                                    label={`Risk: ${rec.riskLevel}`} 
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ 
+                                      borderColor: getRiskLevelColor(rec.riskLevel),
+                                      color: getRiskLevelColor(rec.riskLevel),
+                                      fontSize: '0.75rem'
+                                    }}
+                                  />
+                                </Box>
+                                
+                                <Typography variant="caption" sx={{ color: '#90caf9', display: 'block', mt: 1 }}>
+                                  💡 Click để chọn chiến lược này
+                                </Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                      
+                      <Box sx={{ mt: 2, textAlign: 'center' }}>
+                        <Button
+                          variant="text"
+                          onClick={() => setShowSuggestions(false)}
+                          sx={{ color: '#aaa' }}
+                        >
+                          Đóng gợi ý
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
 
               {/* Custom Date Range */}
               {timeRange === 'custom' && (
@@ -499,7 +786,6 @@ export const BacktestPanel: React.FC = () => {
                 size="large"
                 onClick={handleBacktest}
                 disabled={loading || (timeRange === 'custom' && (!customStartDate || !customEndDate))}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                 sx={{
                   px: 4,
                   py: 1.5,

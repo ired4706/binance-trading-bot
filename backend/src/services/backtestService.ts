@@ -26,6 +26,43 @@ export interface BacktestResponse {
   error?: string;
 }
 
+export interface OptimizationResult {
+  bestParams: any;
+  bestPerformance: PerformanceMetrics;
+  allResults: Array<{
+    params: any;
+    performance: PerformanceMetrics;
+  }>;
+}
+
+export interface MonteCarloResult {
+  simulations: number;
+  confidenceIntervals: {
+    p95: number;
+    p90: number;
+    p75: number;
+    p50: number;
+    p25: number;
+    p10: number;
+    p5: number;
+  };
+  worstCase: number;
+  bestCase: number;
+  expectedValue: number;
+}
+
+export interface WalkForwardResult {
+  periods: Array<{
+    startDate: number;
+    endDate: number;
+    inSample: PerformanceMetrics;
+    outOfSample: PerformanceMetrics;
+    params: any;
+  }>;
+  averageOutOfSample: PerformanceMetrics;
+  stabilityScore: number;
+}
+
 export class BacktestService {
   private indicatorService: IndicatorService;
   private strategies: Map<string, (config: BacktestConfig) => BaseStrategy>;
@@ -436,6 +473,382 @@ export class BacktestService {
     };
     
     return descriptions[strategyName] || 'No description available';
+  }
+
+  /**
+   * Parameter optimization using grid search
+   */
+  async optimizeParameters(
+    request: BacktestRequest,
+    paramRanges: { [key: string]: number[] }
+  ): Promise<OptimizationResult> {
+    const results: Array<{ params: any; performance: PerformanceMetrics }> = [];
+    const paramNames = Object.keys(paramRanges);
+    const paramValues = Object.values(paramRanges);
+    
+    // Generate all parameter combinations
+    const combinations = this.generateCombinations(paramValues);
+    
+    logger.info(`Starting parameter optimization with ${combinations.length} combinations`);
+    
+    for (const combination of combinations) {
+      const params = paramNames.reduce((obj, name, index) => {
+        obj[name] = combination[index];
+        return obj;
+      }, {} as any);
+      
+      // Update config with new parameters
+      const optimizedConfig = { ...request.config, ...params };
+      const optimizedRequest = { ...request, config: optimizedConfig };
+      
+      try {
+        const result = await this.runBacktest(optimizedRequest);
+        if (result.success && result.data) {
+          results.push({
+            params,
+            performance: result.data.performance
+          });
+        }
+      } catch (error) {
+        logger.warn(`Failed to test combination:`, params, error);
+      }
+    }
+    
+    // Find best result based on Sharpe ratio
+    const bestResult = results.reduce((best, current) => {
+      return current.performance.netSharpeRatio > best.performance.netSharpeRatio ? current : best;
+    });
+    
+    return {
+      bestParams: bestResult.params,
+      bestPerformance: bestResult.performance,
+      allResults: results
+    };
+  }
+
+  /**
+   * Monte Carlo simulation for risk analysis
+   */
+  async runMonteCarloSimulation(
+    request: BacktestRequest,
+    simulations: number = 1000
+  ): Promise<MonteCarloResult> {
+    const results: number[] = [];
+    
+    // Run original backtest to get trade distribution
+    const originalResult = await this.runBacktest(request);
+    if (!originalResult.success || !originalResult.data) {
+      throw new Error('Failed to run original backtest for Monte Carlo simulation');
+    }
+    
+    const trades = originalResult.data.trades;
+    if (trades.length === 0) {
+      throw new Error('No trades found for Monte Carlo simulation');
+    }
+    
+    // Extract trade returns for resampling
+    const tradeReturns = trades.map(trade => trade.netPnlPercentage);
+    
+    for (let i = 0; i < simulations; i++) {
+      // Resample trades randomly
+      const simulatedTrades = this.resampleTrades(tradeReturns, trades.length);
+      const simulatedReturn = simulatedTrades.reduce((sum, ret) => sum + ret, 0);
+      results.push(simulatedReturn);
+    }
+    
+    // Calculate confidence intervals
+    results.sort((a, b) => a - b);
+    const confidenceIntervals = {
+      p95: results[Math.floor(results.length * 0.95)],
+      p90: results[Math.floor(results.length * 0.90)],
+      p75: results[Math.floor(results.length * 0.75)],
+      p50: results[Math.floor(results.length * 0.50)],
+      p25: results[Math.floor(results.length * 0.25)],
+      p10: results[Math.floor(results.length * 0.10)],
+      p5: results[Math.floor(results.length * 0.05)]
+    };
+    
+    return {
+      simulations,
+      confidenceIntervals,
+      worstCase: results[0],
+      bestCase: results[results.length - 1],
+      expectedValue: results.reduce((sum, val) => sum + val, 0) / results.length
+    };
+  }
+
+  /**
+   * Walk-forward analysis for out-of-sample testing
+   */
+  async runWalkForwardAnalysis(
+    request: BacktestRequest,
+    windowSize: number = 30, // days
+    stepSize: number = 7     // days
+  ): Promise<WalkForwardResult> {
+    const periods: Array<{
+      startDate: number;
+      endDate: number;
+      inSample: PerformanceMetrics;
+      outOfSample: PerformanceMetrics;
+      params: any;
+    }> = [];
+    
+    // Get historical data to determine date range
+    const candles = await historicalDataService.getHistoricalData({
+      symbol: request.symbol,
+      interval: request.interval,
+      startTime: request.startTime,
+      endTime: request.endTime,
+      limit: 10000
+    });
+    
+    if (candles.length === 0) {
+      throw new Error('No historical data available for walk-forward analysis');
+    }
+    
+    const startTime = candles[0].openTime;
+    const endTime = candles[candles.length - 1].openTime;
+    const windowMs = windowSize * 24 * 60 * 60 * 1000;
+    const stepMs = stepSize * 24 * 60 * 60 * 1000;
+    
+    let currentStart = startTime;
+    
+    while (currentStart + windowMs < endTime) {
+      const inSampleEnd = currentStart + windowMs;
+      const outOfSampleEnd = Math.min(inSampleEnd + stepMs, endTime);
+      
+      // Run in-sample optimization
+      const inSampleRequest = {
+        ...request,
+        startTime: currentStart,
+        endTime: inSampleEnd
+      };
+      
+      // For simplicity, optimize a few key parameters
+      const paramRanges = {
+        stopLoss: [1, 2, 3, 4, 5],
+        takeProfit: [2, 3, 4, 5, 6],
+        positionSize: [5, 10, 15, 20]
+      };
+      
+      const optimization = await this.optimizeParameters(inSampleRequest, paramRanges);
+      
+      // Run out-of-sample test with optimized parameters
+      const outOfSampleRequest = {
+        ...request,
+        startTime: inSampleEnd,
+        endTime: outOfSampleEnd,
+        config: { ...request.config, ...optimization.bestParams }
+      };
+      
+      const outOfSampleResult = await this.runBacktest(outOfSampleRequest);
+      
+      if (outOfSampleResult.success && outOfSampleResult.data) {
+        periods.push({
+          startDate: currentStart,
+          endDate: outOfSampleEnd,
+          inSample: optimization.bestPerformance,
+          outOfSample: outOfSampleResult.data.performance,
+          params: optimization.bestParams
+        });
+      }
+      
+      currentStart += stepMs;
+    }
+    
+    // Calculate average out-of-sample performance
+    const avgOutOfSample = this.calculateAveragePerformance(
+      periods.map(p => p.outOfSample)
+    );
+    
+    // Calculate stability score (consistency of performance)
+    const returns = periods.map(p => p.outOfSample.netTotalReturnPercentage);
+    const stabilityScore = this.calculateStabilityScore(returns);
+    
+    return {
+      periods,
+      averageOutOfSample: avgOutOfSample,
+      stabilityScore
+    };
+  }
+
+  /**
+   * Calculate Value at Risk (VaR)
+   */
+  calculateVaR(trades: Trade[], confidenceLevel: number = 0.95): number {
+    if (trades.length === 0) return 0;
+    
+    const returns = trades.map(trade => trade.netPnlPercentage);
+    returns.sort((a, b) => a - b);
+    
+    const index = Math.floor(returns.length * (1 - confidenceLevel));
+    return Math.abs(returns[index]);
+  }
+
+  /**
+   * Calculate Expected Shortfall (Conditional VaR)
+   */
+  calculateExpectedShortfall(trades: Trade[], confidenceLevel: number = 0.95): number {
+    if (trades.length === 0) return 0;
+    
+    const returns = trades.map(trade => trade.netPnlPercentage);
+    returns.sort((a, b) => a - b);
+    
+    const cutoffIndex = Math.floor(returns.length * (1 - confidenceLevel));
+    const tailReturns = returns.slice(0, cutoffIndex);
+    
+    return Math.abs(tailReturns.reduce((sum, ret) => sum + ret, 0) / tailReturns.length);
+  }
+
+  /**
+   * Calculate Omega Ratio
+   */
+  calculateOmegaRatio(trades: Trade[], threshold: number = 0): number {
+    if (trades.length === 0) return 0;
+    
+    const returns = trades.map(trade => trade.netPnlPercentage);
+    const gains = returns.filter(r => r > threshold);
+    const losses = returns.filter(r => r <= threshold);
+    
+    if (losses.length === 0) return gains.length > 0 ? Infinity : 0;
+    
+    const expectedGain = gains.reduce((sum, gain) => sum + gain, 0) / returns.length;
+    const expectedLoss = Math.abs(losses.reduce((sum, loss) => sum + loss, 0) / returns.length);
+    
+    return expectedLoss > 0 ? expectedGain / expectedLoss : 0;
+  }
+
+  /**
+   * Calculate Ulcer Index
+   */
+  calculateUlcerIndex(trades: Trade[], config: BacktestConfig): number {
+    if (trades.length === 0) return 0;
+    
+    let peak = config.initialBalance;
+    let runningBalance = config.initialBalance;
+    let sumSquaredDrawdown = 0;
+    
+    trades.forEach(trade => {
+      runningBalance += trade.netPnl;
+      
+      if (runningBalance > peak) {
+        peak = runningBalance;
+      }
+      
+      const drawdown = (peak - runningBalance) / peak;
+      sumSquaredDrawdown += drawdown * drawdown;
+    });
+    
+    return Math.sqrt(sumSquaredDrawdown / trades.length);
+  }
+
+  // Helper methods
+  private generateCombinations(arrays: number[][]): number[][] {
+    if (arrays.length === 0) return [[]];
+    
+    const [first, ...rest] = arrays;
+    const restCombinations = this.generateCombinations(rest);
+    
+    return first.flatMap(value => 
+      restCombinations.map(combination => [value, ...combination])
+    );
+  }
+
+  private resampleTrades(returns: number[], count: number): number[] {
+    const resampled: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const randomIndex = Math.floor(Math.random() * returns.length);
+      resampled.push(returns[randomIndex]);
+    }
+    return resampled;
+  }
+
+  private calculateAveragePerformance(performances: PerformanceMetrics[]): PerformanceMetrics {
+    if (performances.length === 0) {
+      return this.getEmptyPerformanceMetrics();
+    }
+    
+    const avg = performances.reduce((sum, perf) => ({
+      totalReturn: sum.totalReturn + perf.totalReturn,
+      totalReturnPercentage: sum.totalReturnPercentage + perf.totalReturnPercentage,
+      winRate: sum.winRate + perf.winRate,
+      totalTrades: sum.totalTrades + perf.totalTrades,
+      winningTrades: sum.winningTrades + perf.winningTrades,
+      losingTrades: sum.losingTrades + perf.losingTrades,
+      averageWin: sum.averageWin + perf.averageWin,
+      averageLoss: sum.averageLoss + perf.averageLoss,
+      profitFactor: sum.profitFactor + perf.profitFactor,
+      maxDrawdown: sum.maxDrawdown + perf.maxDrawdown,
+      maxDrawdownPercentage: sum.maxDrawdownPercentage + perf.maxDrawdownPercentage,
+      sharpeRatio: sum.sharpeRatio + perf.sharpeRatio,
+      averageTradeDuration: sum.averageTradeDuration + perf.averageTradeDuration,
+      totalFees: sum.totalFees + perf.totalFees,
+      totalSlippage: sum.totalSlippage + perf.totalSlippage,
+      netTotalReturn: sum.netTotalReturn + perf.netTotalReturn,
+      netTotalReturnPercentage: sum.netTotalReturnPercentage + perf.netTotalReturnPercentage,
+      netWinRate: sum.netWinRate + perf.netWinRate,
+      netProfitFactor: sum.netProfitFactor + perf.netProfitFactor,
+      netMaxDrawdown: sum.netMaxDrawdown + perf.netMaxDrawdown,
+      netMaxDrawdownPercentage: sum.netMaxDrawdownPercentage + perf.netMaxDrawdownPercentage,
+      netSharpeRatio: sum.netSharpeRatio + perf.netSharpeRatio,
+      calmarRatio: sum.calmarRatio + perf.calmarRatio,
+      sortinoRatio: sum.sortinoRatio + perf.sortinoRatio,
+      maxConsecutiveLosses: sum.maxConsecutiveLosses + perf.maxConsecutiveLosses,
+      maxConsecutiveWins: sum.maxConsecutiveWins + perf.maxConsecutiveWins,
+      averageConsecutiveLosses: sum.averageConsecutiveLosses + perf.averageConsecutiveLosses,
+      averageConsecutiveWins: sum.averageConsecutiveWins + perf.averageConsecutiveWins
+    }));
+    
+    const count = performances.length;
+    Object.keys(avg).forEach(key => {
+      (avg as any)[key] = (avg as any)[key] / count;
+    });
+    
+    return avg;
+  }
+
+  private calculateStabilityScore(returns: number[]): number {
+    if (returns.length < 2) return 0;
+    
+    const mean = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+    const variance = returns.reduce((sum, ret) => sum + Math.pow(ret - mean, 2), 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Higher stability = lower coefficient of variation
+    return stdDev > 0 ? mean / stdDev : 0;
+  }
+
+  private getEmptyPerformanceMetrics(): PerformanceMetrics {
+    return {
+      totalReturn: 0,
+      totalReturnPercentage: 0,
+      winRate: 0,
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+      averageWin: 0,
+      averageLoss: 0,
+      profitFactor: 0,
+      maxDrawdown: 0,
+      maxDrawdownPercentage: 0,
+      sharpeRatio: 0,
+      averageTradeDuration: 0,
+      totalFees: 0,
+      totalSlippage: 0,
+      netTotalReturn: 0,
+      netTotalReturnPercentage: 0,
+      netWinRate: 0,
+      netProfitFactor: 0,
+      netMaxDrawdown: 0,
+      netMaxDrawdownPercentage: 0,
+      netSharpeRatio: 0,
+      calmarRatio: 0,
+      sortinoRatio: 0,
+      maxConsecutiveLosses: 0,
+      maxConsecutiveWins: 0,
+      averageConsecutiveLosses: 0,
+      averageConsecutiveWins: 0
+    };
   }
 }
 

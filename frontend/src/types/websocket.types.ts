@@ -30,9 +30,4 @@ export interface TradingSettings {
     riskRewardRatio: number;
     strategy: 'RSI_EMA50' | 'RSI_EMA200' | 'BB_RSI' | 'SR_VOLUME' | 'ICHIMOKU' | 'MACD_VOLUME' | 'ATR_DYNAMIC' | 'MTF_TREND' | 'STOCHASTIC_RSI' | 'BB_SQUEEZE' | 'SUPPORT_RESISTANCE';
     enabledStrategies: string[];
-}
-
-export interface WebSocketMessage {
-    type: 'price' | 'account' | 'settings';
-    data: PriceData | AccountData | TradingSettings;
 } 

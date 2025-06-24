@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
-import { Container, Box, Paper, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Alert, LinearProgress, Tooltip, IconButton, Tabs, Tab } from '@mui/material';
+import { Container, Box, Alert, LinearProgress, Tooltip, IconButton, Tabs, Tab, Typography } from '@mui/material';
 import { wsService } from './services/websocket.service';
 import { PriceData, AccountData, TradingSettings as TradingSettingsType } from './types/websocket.types';
 import { TradingSettings } from './components/TradingSettings';
-import InfoIcon from '@mui/icons-material/Info';
 import { BacktestPanel } from './components/BacktestPanel';
+import { AdvancedBacktestPanel } from './components/AdvancedBacktestPanel';
 import { PriceTable } from './components/PriceTable/PriceTable';
 import { AccountInfo } from './components/AccountInfo/AccountInfo';
 
@@ -485,6 +485,7 @@ function App() {
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab label="Live Trading" />
           <Tab label="Backtest" />
+          <Tab label="Advanced Backtest" />
         </Tabs>
       </Box>
 
@@ -522,6 +523,12 @@ function App() {
       {activeTab === 1 && (
         <Box>
           <BacktestPanel />
+        </Box>
+      )}
+
+      {activeTab === 2 && (
+        <Box>
+          <AdvancedBacktestPanel />
         </Box>
       )}
     </Container>
